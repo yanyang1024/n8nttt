@@ -1,0 +1,158 @@
+{
+  "name": "Local Inventory RAG Demo",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "trigger-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "triggerOn": "fileCreated",
+        "path": "D:/GR_C_FRAME/n8n_demo",
+        "fileNamePattern": "query.txt",
+        "options": {}
+      },
+      "id": "file-trigger",
+      "name": "Local File Trigger",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.path }}",
+        "options": {
+          "encoding": "utf8"
+        }
+      },
+      "id": "read-file",
+      "name": "Read Query File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=python \"D:/GR_C_FRAME/n8n_demo/rpa/rpa.py\" \"{{ $json.data.trim() }}\""
+      },
+      "id": "execute-rpa",
+      "name": "Execute RPA Script",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "qwen2.5:7b"
+            },
+            {
+              "name": "prompt",
+              "value": "=你是一个库存助手。用户查询：{{ $('Read Query File').item.json.data.trim() }}。系统查询结果：{{ $json.stdout }}。请根据库存数据回答用户，如果库存少于10，提醒补货。"
+            },
+            {
+              "name": "stream",
+              "value": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-request",
+      "name": "Ollama Brain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileSelector": "D:/GR_C_FRAME/n8n_demo/result.txt",
+        "data": "={{ $json.response }}",
+        "options": {}
+      },
+      "id": "write-result",
+      "name": "Write Result",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Local File Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Query File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Query File": {
+      "main": [
+        [
+          {
+            "node": "Execute RPA Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute RPA Script": {
+      "main": [
+        [
+          {
+            "node": "Ollama Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Brain": {
+      "main": [
+        [
+          {
+            "node": "Write Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
